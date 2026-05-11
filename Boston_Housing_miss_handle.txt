@@ -1,0 +1,98 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.callbacks import EarlyStopping
+
+
+
+
+df = pd.read_csv('BostonHousing.csv')
+
+
+
+print("Dataset Shape:", df.shape)
+print(df.head())
+
+
+
+
+# Handle Missing Values
+print("\nMissing values before handling:")
+print(df.isnull().sum())
+df['rm'].fillna(df['rm'].median(), inplace=True)
+print("\nMissing values after handling:")
+print(df.isnull().sum())
+
+
+
+X = df.drop('medv', axis=1)
+y = df['medv']
+
+
+scaler = StandardScaler()
+X = scaler.fit_transform(X)
+
+
+print("First 5 rows of scaled data:")
+print(X[:5])
+
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.3, random_state=42
+)
+
+
+print("Training set shape:", X_train.shape, y_train.shape)
+print("Testing set shape:", X_test.shape, y_test.shape)
+
+
+model = Sequential()
+
+
+model.add(Dense(64, input_dim=13, activation='relu'))
+
+
+model.add(Dropout(0.2))
+
+
+model.add(Dense(32, activation='relu'))
+
+
+model.add(Dense(1))
+
+
+print(model.summary())
+
+model.compile(
+    loss='mean_squared_error',
+    optimizer='adam',
+    metrics=['mean_absolute_error']
+)
+
+
+early_stopping = EarlyStopping(monitor='val_loss', patience=5)
+
+
+history = model.fit(
+    X_train, y_train,
+    validation_split=0.2,
+    epochs=100,
+    batch_size=32,
+    callbacks=[early_stopping]
+)
+
+
+
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('Model Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend(['Training', 'Validation'])
+plt.show()
+loss, mae = model.evaluate(X_test, y_test)
+print('Mean Absolute Error:', mae)

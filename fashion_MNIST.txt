@@ -1,0 +1,154 @@
+import tensorflow as tf
+from tensorflow import keras
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+
+fashion_mnist = keras.datasets.fashion_mnist
+(train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
+
+print("Training images shape:", train_images.shape)  # (60000, 28, 28)
+print("Testing images shape:", test_images.shape)    # (10000, 28, 28)
+print("Training labels:", train_labels[:10])
+
+
+
+
+class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
+               'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
+
+
+
+
+plt.figure(figsize=(10, 5))
+for i in range(10):
+    plt.subplot(2, 5, i+1)
+    plt.imshow(train_images[i], cmap='gray')
+    plt.title(class_names[train_labels[i]])
+    plt.axis('off')
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+train_images = train_images / 255.0
+test_images  = test_images  / 255.0
+
+print("Pixel value range after normalization:", train_images.min(), "to", train_images.max())
+
+
+
+
+
+model = keras.Sequential([
+    # Flatten: converts 28x28 grid into flat array of 784 numbers
+    keras.layers.Flatten(input_shape=(28, 28)),
+    
+    # First Dense hidden layer: 128 neurons, ReLU activation
+    keras.layers.Dense(128, activation='relu'),
+    
+    # Output layer: 10 neurons (one per class), Softmax for probabilities
+    keras.layers.Dense(10, activation='softmax')
+])
+
+# Display model summary
+model.summary()
+
+
+
+
+
+
+model.compile(
+    optimizer='adam',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+
+
+
+
+history = model.fit(
+    train_images, train_labels,
+    epochs=10,
+    validation_split=0.2,
+    batch_size=32
+)
+
+
+
+
+plt.figure(figsize=(12, 4))
+
+# Accuracy plot
+plt.subplot(1, 2, 1)
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+plt.title('Model Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend(['Training', 'Validation'])
+
+# Loss plot
+plt.subplot(1, 2, 2)
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('Model Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend(['Training', 'Validation'])
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+test_loss, test_acc = model.evaluate(test_images, test_labels)
+print('Test accuracy:', test_acc)
+
+
+
+
+predictions = model.predict(test_images)
+predicted_labels = np.argmax(predictions, axis=1)
+
+
+
+
+num_rows = 5
+num_cols = 5
+num_images = num_rows * num_cols
+
+plt.figure(figsize=(2 * 2 * num_cols, 2 * num_rows))
+
+for i in range(num_images):
+    # Left: show the image
+    plt.subplot(num_rows, 2 * num_cols, 2 * i + 1)
+    plt.imshow(test_images[i], cmap='gray')
+    plt.axis('off')
+    
+    # Color: green if correct, red if wrong
+    color = 'green' if predicted_labels[i] == test_labels[i] else 'red'
+    plt.title(f"Pred: {class_names[predicted_labels[i]]}", color=color, fontsize=7)
+    
+    # Right: show probability bar chart
+    plt.subplot(num_rows, 2 * num_cols, 2 * i + 2)
+    plt.bar(range(10), predictions[i])
+    plt.xticks(range(10), rotation=90, fontsize=6)
+    plt.ylim([0, 1])
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+
+
+
+

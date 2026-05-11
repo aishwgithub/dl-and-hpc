@@ -1,0 +1,179 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.model_selection import train_test_split
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.utils import to_categorical
+
+
+
+df = pd.read_csv('letter-recognition.csv')
+
+print("Dataset Shape  :", df.shape)
+print("Column Names   :", df.columns.tolist())
+print("\nFirst 5 rows:")
+print(df.head())
+print("\nClass distribution (how many of each letter):")
+print(df.iloc[:, 0].value_counts().sort_index())
+
+
+
+# First column = letter (target), rest = 16 features (input)
+X = df.iloc[:, 1:].values   # All rows, columns 1 to end (16 features)
+y = df.iloc[:, 0].values    # All rows, column 0 only (letters A-Z)
+
+print("\nFeatures shape (X):", X.shape)   # (20000, 16)
+print("Labels shape   (y):", y.shape)    # (20000,)
+print("Sample labels  :", y[:10])        # ['T', 'I', 'D', ...]
+
+
+
+# Step 4a: LabelEncoder converts A-Z → 0-25
+label_encoder = LabelEncoder()
+y_encoded     = label_encoder.fit_transform(y)
+
+print("\nAfter LabelEncoder:")
+print("Sample:", y[:5], "→", y_encoded[:5])
+
+# Step 4b: to_categorical converts 0-25 → one-hot vectors
+num_classes = len(label_encoder.classes_)   # = 26
+y_onehot    = to_categorical(y_encoded, num_classes=num_classes)
+
+print("\nAfter to_categorical (one-hot):")
+print("Shape:", y_onehot.shape)       # (20000, 26)
+print("Sample letter A:", y_onehot[np.where(y=='A')[0][0]])
+
+
+
+scaler    = StandardScaler()
+X_scaled  = scaler.fit_transform(X)
+
+print("\nBefore scaling - Feature range:", X.min(), "to", X.max())
+print("After scaling  - Feature range:", round(X_scaled.min(),2),
+      "to", round(X_scaled.max(),2))
+
+
+
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y_onehot,
+    test_size=0.2,
+    random_state=42
+)
+
+print("\nTraining set shape:", X_train.shape, y_train.shape)
+print("Testing set shape :", X_test.shape,  y_test.shape)
+
+
+
+
+model = Sequential()
+
+# First Hidden Layer: 256 neurons, ReLU, accepts 16 features
+model.add(Dense(256, input_dim=16, activation='relu'))
+model.add(Dropout(0.3))
+
+# Second Hidden Layer: 128 neurons, ReLU
+model.add(Dense(128, activation='relu'))
+model.add(Dropout(0.3))
+
+# Third Hidden Layer: 64 neurons, ReLU
+model.add(Dense(64, activation='relu'))
+model.add(Dropout(0.2))
+
+# Output Layer: 26 neurons (one per letter), Softmax
+model.add(Dense(26, activation='softmax'))
+
+model.summary()
+
+
+
+model.compile(
+    optimizer='adam',
+    loss='categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+
+
+early_stopping = EarlyStopping(
+    monitor='val_loss',
+    patience=5,
+    restore_best_weights=True
+)
+
+history = model.fit(
+    X_train, y_train,
+    epochs=50,
+    batch_size=64,
+    validation_split=0.2,
+    callbacks=[early_stopping],
+    verbose=1
+)
+
+
+
+plt.figure(figsize=(12, 4))
+
+# Accuracy Plot
+plt.subplot(1, 2, 1)
+plt.plot(history.history['accuracy'],     label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Val Accuracy')
+plt.title('Model Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+
+# Loss Plot
+plt.subplot(1, 2, 2)
+plt.plot(history.history['loss'],     label='Train Loss')
+plt.plot(history.history['val_loss'], label='Val Loss')
+plt.title('Model Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+
+
+test_loss, test_acc = model.evaluate(X_test, y_test)
+print(f'\nTest Accuracy : {test_acc:.4f}')
+print(f'Test Loss     : {test_loss:.4f}')
+
+
+
+
+
+# ═══════════════════════════════════════
+predictions       = model.predict(X_test)
+predicted_indices = np.argmax(predictions, axis=1)
+actual_indices    = np.argmax(y_test,       axis=1)
+
+# Convert indices back to actual letters
+predicted_letters = label_encoder.inverse_transform(predicted_indices)
+actual_letters    = label_encoder.inverse_transform(actual_indices)
+
+print("\nSample Predictions (first 15):")
+print("Predicted:", predicted_letters[:15])
+print("Actual   :", actual_letters[:15])
+
+
+
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
+
+print("\nClassification Report:")
+print(classification_report(actual_letters, predicted_letters))
+
+
+
+
+
+

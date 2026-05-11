@@ -1,0 +1,110 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, Bidirectional, LSTM, Dense, Dropout
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.datasets import imdb                  # ← DIRECT IMPORT!
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+
+
+
+# No CSV needed! Keras has IMDB built-in!
+vocab_size = 10000   # Only top 10,000 most common words
+
+(X_train, y_train), (X_test, y_test) = imdb.load_data(num_words=vocab_size)
+
+print("Training samples      :", len(X_train))
+print("Testing samples       :", len(X_test))
+print("\nSample review (as numbers already):")
+print(X_train[0][:20], "...")   # first 20 numbers of first review
+print("\nSample label (0=negative, 1=positive):", y_train[0])
+
+
+
+# All reviews made exactly 250 words long
+max_len = 250
+
+X_train = pad_sequences(X_train, maxlen=max_len, padding='pre', truncating='pre')
+X_test  = pad_sequences(X_test,  maxlen=max_len, padding='pre', truncating='pre')
+
+print("\nX_train shape after padding:", X_train.shape)
+print("X_test  shape after padding:", X_test.shape)
+
+
+
+# ---- STEP 4: Build the Model Architecture ----
+model = Sequential()
+
+# Embedding Layer — input_length REMOVED (deprecated in new Keras)
+model.add(Embedding(input_dim=vocab_size, output_dim=128))
+
+# First Bidirectional LSTM Layer
+model.add(Bidirectional(LSTM(64, return_sequences=True)))
+model.add(Dropout(0.3))
+
+# Second Bidirectional LSTM Layer
+model.add(Bidirectional(LSTM(32)))
+model.add(Dropout(0.3))
+
+# Output Layer
+model.add(Dense(1, activation='sigmoid'))
+
+print(model.summary())
+
+
+
+model.compile(
+    loss='binary_crossentropy',
+    optimizer='adam',
+    metrics=['accuracy']
+)
+
+
+
+
+early_stopping = EarlyStopping(
+    monitor='val_loss',
+    patience=3,
+    restore_best_weights=True
+)
+
+history = model.fit(
+    X_train, y_train,
+    epochs=10,
+    batch_size=128,
+    validation_split=0.2,
+    callbacks=[early_stopping]
+)
+
+
+
+
+plt.figure(figsize=(12, 4))
+
+# Accuracy Plot
+plt.subplot(1, 2, 1)
+plt.plot(history.history['accuracy'])
+plt.plot(history.history['val_accuracy'])
+plt.title('Model Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend(['Training', 'Validation'])
+
+# Loss Plot
+plt.subplot(1, 2, 2)
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('Model Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
+plt.legend(['Training', 'Validation'])
+
+plt.tight_layout()
+plt.show()
+
+
+
+
+loss, acc = model.evaluate(X_test, y_test, batch_size=128)
+print(f'Test accuracy: {acc:.4f}, Test loss: {loss:.4f}')
