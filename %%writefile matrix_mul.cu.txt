@@ -1,0 +1,125 @@
+%%writefile matrix_mul.cu
+
+#include <stdio.h>
+#include <stdlib.h>
+
+// ============================================
+// GPU KERNEL — each thread computes ONE element of result matrix C
+// ============================================
+__global__ void matmul(float *A, float *B, float *C, int N)
+{
+    // In 2D: find which ROW and COLUMN this thread handles
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Only compute if within matrix bounds
+    if (row < N && col < N)
+    {
+        float sum = 0.0;
+
+        // Dot product: multiply row of A with column of B
+        for (int k = 0; k < N; k++)
+        {
+            sum += A[row * N + k] * B[k * N + col];
+        }
+
+        // Store result
+        C[row * N + col] = sum;
+    }
+}
+
+// ============================================
+// MAIN FUNCTION (CPU)
+// ============================================
+int main()
+{
+    int N;
+
+    // Take matrix size from user
+    printf("Enter the size of matrix (NxN): ");
+    scanf("%d", &N);
+
+    int size = N * N * sizeof(float);  // Total bytes for one matrix
+
+    // Allocate CPU memory
+    float *A = (float*)malloc(size);
+    float *B = (float*)malloc(size);
+    float *C = (float*)malloc(size);
+
+    // Take Matrix A input
+    printf("Enter elements of Matrix A (%dx%d):\n", N, N);
+    for (int i = 0; i < N * N; i++)
+    {
+        printf("A[%d][%d] = ", i/N, i%N);
+        scanf("%f", &A[i]);
+    }
+
+    // Take Matrix B input
+    printf("Enter elements of Matrix B (%dx%d):\n", N, N);
+    for (int i = 0; i < N * N; i++)
+    {
+        printf("B[%d][%d] = ", i/N, i%N);
+        scanf("%f", &B[i]);
+    }
+
+    // Allocate GPU memory
+    float *d_A, *d_B, *d_C;
+    cudaMalloc(&d_A, size);
+    cudaMalloc(&d_B, size);
+    cudaMalloc(&d_C, size);
+
+    // Copy CPU --> GPU
+    cudaMemcpy(d_A, A, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, B, size, cudaMemcpyHostToDevice);
+
+    // Set up 2D grid of threads
+    // Each thread handles one (row, col) pair
+    dim3 threadsPerBlock(16, 16);   // 16x16 = 256 threads per block (2D)
+    dim3 blocksPerGrid(
+        (N + 15) / 16,   // blocks needed in X direction
+        (N + 15) / 16    // blocks needed in Y direction
+    );
+
+    // Launch kernel
+    matmul<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, d_C, N);
+
+    // Copy result GPU --> CPU
+    cudaMemcpy(C, d_C, size, cudaMemcpyDeviceToHost);
+
+    // Print Matrix A
+    printf("\nMatrix A:\n");
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++)
+            printf("%.1f\t", A[i*N + j]);
+        printf("\n");
+    }
+
+    // Print Matrix B
+    printf("\nMatrix B:\n");
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++)
+            printf("%.1f\t", B[i*N + j]);
+        printf("\n");
+    }
+
+    // Print Result C
+    printf("\nResult C = A x B:\n");
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j++)
+            printf("%.1f\t", C[i*N + j]);
+        printf("\n");
+    }
+
+    // Free memory
+    free(A); free(B); free(C);
+    cudaFree(d_A); cudaFree(d_B); cudaFree(d_C);
+
+    return 0;
+}
+
+
+run commands
+
+!nvcc matrix_mul.cu -o matrix_mul
+
+!echo -e "2\n1 2 3 4\n5 6 7 8" | ./matrix_mul
