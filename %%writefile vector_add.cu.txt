@@ -1,0 +1,104 @@
+%%writefile vector_add.cu
+
+#include <stdio.h>
+#include <stdlib.h>
+
+// ============================================
+// STEP 1: GPU KERNEL FUNCTION
+// This runs ON the GPU — each thread adds ONE element
+// ============================================
+__global__ void vectorAdd(int *A, int *B, int *C, int N)
+{
+    // Each thread finds its unique position (index)
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Safety check: only work if index is within array size
+    if (i < N)
+    {
+        C[i] = A[i] + B[i];  // Thread i adds A[i] + B[i] and stores in C[i]
+    }
+}
+
+// ============================================
+// STEP 2: MAIN FUNCTION (runs on CPU)
+// ============================================
+int main()
+{
+    int N;
+
+    // ------- Take input from user -------
+    printf("Enter the size of vectors: ");
+    scanf("%d", &N);
+
+    // ------- Allocate memory on CPU (Host) -------
+    int *A = (int*)malloc(N * sizeof(int));  // Array A on CPU
+    int *B = (int*)malloc(N * sizeof(int));  // Array B on CPU
+    int *C = (int*)malloc(N * sizeof(int));  // Result array on CPU
+
+    // ------- Take vector elements from user -------
+    printf("Enter %d elements for Vector A:\n", N);
+    for (int i = 0; i < N; i++)
+    {
+        printf("A[%d] = ", i);
+        scanf("%d", &A[i]);
+    }
+
+    printf("Enter %d elements for Vector B:\n", N);
+    for (int i = 0; i < N; i++)
+    {
+        printf("B[%d] = ", i);
+        scanf("%d", &B[i]);
+    }
+
+    // ------- Declare GPU (Device) pointers -------
+    int *d_A, *d_B, *d_C;   // d_ means "device" (GPU)
+
+    // ------- Allocate memory ON the GPU -------
+    cudaMalloc(&d_A, N * sizeof(int));
+    cudaMalloc(&d_B, N * sizeof(int));
+    cudaMalloc(&d_C, N * sizeof(int));
+
+    // ------- Copy data from CPU --> GPU -------
+    cudaMemcpy(d_A, A, N * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, B, N * sizeof(int), cudaMemcpyHostToDevice);
+
+    // ------- Set up blocks and threads -------
+    int threadsPerBlock = 256;  // Each block has 256 threads
+    // How many blocks do we need?
+    // If N=1000, threads=256: we need ceil(1000/256) = 4 blocks
+    int blocksPerGrid = (N + threadsPerBlock - 1) / threadsPerBlock;
+
+    // ------- LAUNCH the GPU kernel! -------
+    // This starts ALL threads on the GPU simultaneously
+    vectorAdd<<<blocksPerGrid, threadsPerBlock>>>(d_A, d_B, d_C, N);
+
+    // ------- Copy result from GPU --> CPU -------
+    cudaMemcpy(C, d_C, N * sizeof(int), cudaMemcpyDeviceToHost);
+
+    // ------- Print the result -------
+    printf("\nVector A: ");
+    for (int i = 0; i < N; i++) printf("%d ", A[i]);
+
+    printf("\nVector B: ");
+    for (int i = 0; i < N; i++) printf("%d ", B[i]);
+
+    printf("\nResult C = A + B: ");
+    for (int i = 0; i < N; i++) printf("%d ", C[i]);
+    printf("\n");
+
+    // ------- Free all memory -------
+    free(A); free(B); free(C);           // Free CPU memory
+    cudaFree(d_A); cudaFree(d_B); cudaFree(d_C);  // Free GPU memory
+
+    return 0;
+}
+
+
+
+
+run commands
+
+!nvcc vector_add.cu -o vector_add
+
+
+!echo -e "5\n1 2 3 4 5\n10 20 30 40 50" | ./vector_add

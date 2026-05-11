@@ -1,0 +1,123 @@
+#include<iostream>
+#include<vector>
+#include<omp.h>
+
+using namespace std;
+
+/* =========================
+   SEQUENTIAL BUBBLE SORT
+   ========================= */
+
+void SequentialBubbleSort(vector<int>&arr){
+
+        int n = arr.size();
+
+        for(int i = 0;i<n-1;i++){
+
+                for(int j = 0;j<n-i-1;j++){
+
+                        if(arr[j] > arr[j+1]){
+
+                                swap(arr[j],arr[j+1]);
+                        }
+                }
+        }
+}
+
+/* =========================
+   PARALLEL BUBBLE SORT
+   ========================= */
+
+void ParallelBubbleSort(vector<int>&arr){
+
+        int n = arr.size();
+
+        // we need n passes to guarantee full sorting
+        for(int i = 0;i<n;i++){
+
+                // odd pass - compare pairs (0,1),(2,3),(4,5)....
+
+                #pragma omp parallel for
+                for(int j = 0;j<n-1;j+=2){
+
+                        if(arr[j]>arr[j+1]){
+
+                                swap(arr[j],arr[j+1]);
+                        }
+                }
+
+                // even pass - compare pairs (1,2),(3,4),(5,6)....
+
+                #pragma omp parallel for
+                for(int j = 1;j<n-1;j+=2){
+
+                        if(arr[j]>arr[j+1]){
+
+                                swap(arr[j],arr[j+1]);
+                        }
+                }
+        }
+}
+
+/* =========================
+   MAIN FUNCTION
+   ========================= */
+
+int main(){
+
+        int n;
+
+        cout<< "Enter number of elements: ";
+        cin>>n;
+
+        vector<int> seqArr(n),parArr(n);
+
+        cout<< "Enter "<< n << " elements:\n";
+
+        for(int i = 0;i<n;i++){
+
+                cin>>seqArr[i];
+
+                parArr[i] = seqArr[i];
+        }
+
+        /* =========================
+           SEQUENTIAL BUBBLE SORT
+           ========================= */
+
+        double t1 = omp_get_wtime();
+
+        SequentialBubbleSort(seqArr);
+
+        double t2 = omp_get_wtime();
+
+        cout<< "\nSequential Bubble Sort:\n";
+
+        for(int x : seqArr)
+                cout<< x << " ";
+
+        cout<< "\nExecution Time: "
+            << (t2-t1)
+            << " sec\n";
+
+        /* =========================
+           PARALLEL BUBBLE SORT
+           ========================= */
+
+        double t3 = omp_get_wtime();
+
+        ParallelBubbleSort(parArr);
+
+        double t4 = omp_get_wtime();
+
+        cout<< "\nParallel Bubble Sort:\n";
+
+        for(int x : parArr)
+                cout<< x << " ";
+
+        cout<< "\nExecution Time: "
+            << (t4-t3)
+            << " sec\n";
+
+        return 0;
+}

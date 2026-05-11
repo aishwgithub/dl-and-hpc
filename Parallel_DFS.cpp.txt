@@ -1,0 +1,92 @@
+#include <iostream>
+#include<vector>
+#include<omp.h>
+
+using namespace std;
+
+int vertices;
+vector<vector<int>> adjList;
+
+void addEdge(int u,int v){
+	adjList[u].push_back(v);
+	adjList[v].push_back(u);
+}
+
+void parallelDFS(int start){
+
+	vector<bool> visited(vertices,false);
+
+	// dfs uses a stack instead of queues
+	vector<int> stk;
+	stk.push_back(start);
+
+	cout<<"DFS: ";
+
+	while(!stk.empty()){
+
+		// take the top element
+		int node = stk.back();
+		stk.pop_back();
+
+		//process only if not visited
+		if(!visited[node]){
+
+			visited[node] = true;
+
+			#pragma omp critical
+			cout<<node<<" ";
+
+			// push all unvisited neighbors in parallel
+			#pragma omp parallel for
+			for(int i = 0;i<(int)adjList[node].size();i++){
+
+				int neighbor = adjList[node][i];
+
+				#pragma omp critical
+				{
+					if(!visited[neighbor]){
+						stk.push_back(neighbor);
+					}
+				}
+			}
+		}
+	}
+
+	cout<<endl;
+}
+
+int main(){
+
+	int edges;
+
+	cout<< "Enter number of vertices:";
+	cin>> vertices;
+
+	adjList.resize(vertices);
+
+	cout<< "Enter number of edges:";
+	cin>>edges;
+
+	cout<< "Enter the number of edges as u v\n";
+
+	for(int i = 0;i<edges;i++){
+		int u,v;
+		cin>>u>>v;
+		addEdge(u,v);
+	}
+
+	int start;
+
+	cout<<"Enter the starting node:";
+	cin>>start;
+
+	double t1 = omp_get_wtime();
+
+	parallelDFS(start);
+
+	double t2 = omp_get_wtime();
+
+	cout<<"DFS Time:"<<(t2-t1)<<" sec\n";
+
+	return 0;
+}
